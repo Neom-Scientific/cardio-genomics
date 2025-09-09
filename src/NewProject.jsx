@@ -1,0 +1,330 @@
+import React, { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
+import * as XLSX from 'xlsx';
+import path from 'path-browserify';
+import Cookies from 'js-cookie';
+import { toast, ToastContainer } from 'react-toastify';
+
+const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB
+
+function NewProject({ onShowAnalysis }) {
+  // const [uploadProgress, setUploadProgress] = useState(0);
+  const [sampleIds, setSampleIds] = useState([]);
+  const [testName, setTestName] = useState('');
+  const [email, setEmail] = useState('');
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [fileProgress, setFileProgress] = useState({});
+  const [selectedFiles, setSelectedFiles] = useState({});
+  const [fileSpeed, setFileSpeed] = useState({});
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const fileUploadStats = useRef({});
+
+  useEffect(() => {
+    const user = Cookies.get('cardio_genomics_user') || '';
+    const email = JSON.parse(user).email;
+    setEmail(email);
+  }, []);
+
+  const cleanId = (id) => {
+    if (!id) return '';
+    return id
+      .toString()
+      .trim()
+      .normalize()
+      .replace(/(_R[12]|_[12])$/, '');
+  };
+
+  const extractBaseName = (fileName) => {
+    let baseName = path.basename(fileName).replace(/\.(fastq|fq)(\.gz)?$/i, '');
+    baseName = cleanId(baseName);
+    return baseName;
+  };
+
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data);
+    const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+
+    const ids = sheetData
+      .map(row => {
+        // Find the key that matches "sample id" (case-insensitive, ignore spaces/underscores)
+        const sampleIdKey = Object.keys(row).find(
+          key => key.replace(/[\s_]/g, '').toLowerCase() === 'sampleid'
+        );
+        return cleanId(row[sampleIdKey]);
+      })
+      .filter(Boolean);
+
+    setSampleIds(ids);
+
+    toast.success(`Excel loaded with ${ids.length} Sample IDs`);
+    // alert(`Excel loaded with ${ids.length} Sample IDs`);
+  };
+
+  // Limit the number of concurrent promises
+  async function promisePool(tasks, poolLimit = 25) {
+    const results = [];
+    const executing = [];
+    for (const task of tasks) {
+      const p = Promise.resolve().then(() => task());
+      results.push(p);
+
+      if (poolLimit <= tasks.length) {
+        const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+        executing.push(e);
+        if (executing.length >= poolLimit) {
+          await Promise.race(executing);
+        }
+      }
+    }
+    return Promise.all(results);
+  }
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    setSelectedFiles(files.map(f => f.name)); // Store all file names
+    setFileProgress(files.reduce((acc, f) => ({ ...acc, [f.name]: 0 }), {}));
+    setFileSpeed(files.reduce((acc, f) => ({ ...acc, [f.name]: 0 }), {}));
+    fileUploadStats.current = {};
+    files.forEach(file => {
+      fileUploadStats.current[file.name] = {
+        lastTime: Date.now(),
+        lastLoaded: 0,
+        totalLoaded: 0
+      };
+    });
+    let sessionId = new Date().toLocaleString('en-GB', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).replace(/[/, ]/g, '-').replace(/:/g, '-');
+    const uploadedFiles = [];
+    if (testName === '') {
+      // alert('Please select a test name before uploading files');
+      toast.error('Please select a test name before uploading files');
+      return;
+    }
+    sessionId = sessionId + '-' + email;
+
+    const validProcess = await axios.get(`${process.env.REACT_APP_URL}start-project?email=${encodeURIComponent(email)}&numberofsamples=${sampleIds.length}&application_type=${encodeURIComponent("cardio")}`);
+
+    // console.log('validProcess:', validProcess);
+    if (validProcess.data.status === 400) {
+      toast.error(validProcess.data.message);
+      return;
+    }
+
+    if (validProcess.status === 200) {
+      if (validProcess.status === 200) {
+        // Create an array of upload tasks (functions)
+        const uploadTasks = files.map(file => async () => {
+          if (/\.(fastq|fq)(\.gz)?$/i.test(file.name)) {
+            const baseName = extractBaseName(file.name);
+            const matched = sampleIds.some(id => cleanId(id) === baseName);
+
+            if (!matched) {
+              toast.error(`FASTQ file "${file.name}" not found in Excel's "Sample ID" column`);
+              return;
+            }
+          }
+          setShowProgressModal(true);
+
+          let lastTime = Date.now();
+          let lastLoaded = 0;
+          const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+          for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunk = file.slice(start, end);
+
+            const formData = new FormData();
+            formData.append('chunk', chunk);
+            formData.append('sessionId', sessionId);
+            formData.append('projectName', projectName);
+            formData.append('chunkIndex', i);
+            formData.append('fileName', file.name);
+
+            let success = false;
+            let attempts = 0;
+            const maxRetries = 20;
+
+            while (!success && attempts < maxRetries) {
+              try {
+                await axios.post(
+                  `${process.env.REACT_APP_URL}upload?sessionId=${sessionId}&chunkIndex=${i}&fileName=${encodeURIComponent(file.name)}&projectName=${encodeURIComponent(projectName)}&email=${encodeURIComponent(email)}&processingMode=${encodeURIComponent("hyper_mode")}&application_type=${encodeURIComponent("cardio")}`,
+                  formData,
+                  {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    timeout: 600000,
+                    onUploadProgress: (progressEvent) => {
+                      const stats = fileUploadStats.current[file.name];
+                      const now = Date.now();
+                      const chunkLoaded = (i * CHUNK_SIZE) + progressEvent.loaded;
+                      const timeDiff = (now - stats.lastTime) / 1000;
+                      const bytesDiff = chunkLoaded - stats.lastLoaded;
+                      if (timeDiff > 0) {
+                        const speed = bytesDiff / timeDiff;
+                        setFileSpeed(prev => ({
+                          ...prev,
+                          [file.name]: speed
+                        }));
+                        stats.lastTime = now;
+                        stats.lastLoaded = chunkLoaded;
+                      }
+                      const percent = Math.round(
+                        ((i + progressEvent.loaded / progressEvent.total) / totalChunks) * 100
+                      );
+                      setFileProgress(prev => ({
+                        ...prev,
+                        [file.name]: percent
+                      }));
+                    }
+                  }
+                );
+                success = true; // If upload succeeds, exit the retry loop
+              } catch (err) {
+                attempts++;
+                if (attempts >= maxRetries) {
+                  toast.error(`Failed to upload chunk ${i + 1} of ${file.name} after ${maxRetries} attempts.`);
+                  throw err; // Or handle as needed
+                }
+                // Optionally, add a delay before retrying
+                await new Promise(res => setTimeout(res, 1000));
+              }
+            }
+          }
+
+          uploadedFiles.push(file.name);
+        });
+
+        // Use the pool with a concurrency limit (e.g., 2)
+        await promisePool(uploadTasks, 25);
+
+        await axios.post(`${process.env.REACT_APP_URL}merge`, {
+          sessionId,
+          fileNames: uploadedFiles,
+          testName,
+          email,
+          numberOfSamples: sampleIds.length,
+          projectName,
+        });
+
+        localStorage.setItem('sessionId', sessionId);
+        setShowAnalysis(true);
+        setShowProgressModal(false);
+        toast.success('All valid files uploaded and merged successfully!');
+      }
+    }
+  };
+
+  if (showAnalysis) {
+    onShowAnalysis();
+    return null;
+  }
+
+  return (
+    <div className="mx-auto py-8 px-4">
+      <label className="block text-lg font-semibold mb-2">Project Name</label>
+      <input
+        className="w-1/2 mb-6 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-400"
+        type="text"
+        value={projectName}
+        onChange={(e) => setProjectName(e.target.value)}
+        placeholder="Project Name"
+      />
+      <div className='flex flex-col md:flex-row gap-4'>
+        <div className='w-full'>
+          <label className="block text-xl font-bold mb-2">Upload Excel Sheet</label>
+          <input
+            className="w-full mb-1 px-4 py-1 border rounded"
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleExcelUpload}
+          />
+          <div className="text-sm mb-6">Supported formats: .xls, .xlsx</div>
+        </div>
+        <div className="w-full flex flex-col items-start">
+          <span className="block text-xl font-bold mb-2">Download Sheet Format</span>
+          <a href='/downloads/sample_sheet.xls' className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded">
+            Download Excel File
+          </a>
+        </div>
+      </div>
+
+      <label className="block text-xl font-bold mb-2">Select the Type of Test</label>
+      <select
+      className='w-1/2 mb-6 px-4 py-2 border rounded bg-white text-black'
+      onChange={(e)=>setTestName(e.target.value)}
+      value={testName}
+      >
+        <option value=''>Select Test Type</option>
+        <option value='cmp'>CMP</option>
+        <option value='cms'>CMS</option>
+        <option value='cadd'>CADD</option>
+      </select>
+
+
+      <label className="block text-xl font-bold mb-2">Upload Files</label>
+      <input
+        className="w-1/2 mb-1 px-4 py-1 border rounded"
+        type="file"
+        accept='.fastq,.fq ,.fastq.gz,.fq.gz '
+        multiple
+        onChange={handleFileUpload}
+      />
+      <div className="text-sm  mb-6">Accepted: .fastq, .fq, .fastq.gz, .fq.gz</div>
+
+      {/* Table */}
+      <div className="mt-12">
+        <table className="min-w-full border-t">
+          <thead>
+            <tr>
+              <th className="px-4 py-2 text-left">Serial No</th>
+              <th className="px-4 py-2 text-left">Sample ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sampleIds.map((id, index) => (
+              <tr key={index}>
+                <td className="px-4 py-2">{index + 1}</td>
+                <td className="px-4 py-2">{id}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="text-center text-sm  mt-2">Check the Sheet Data</div>
+      </div>
+      {showProgressModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md flex flex-col items-center">
+            <span className="text-lg font-semibold mb-4">Uploading Files...</span>
+            {/* Add scrollable container here */}
+            <div className="w-full space-y-4 max-h-80 overflow-y-auto">
+              {Object.entries(fileProgress).map(([name, percent]) => (
+                <div key={name} className="mb-2">
+                  <div className="text-sm font-medium mb-1">{name}</div>
+                  <progress className="w-full" value={percent} max="100" />
+                  <span className="text-xs ml-2">{percent}%</span>
+                  <span className="text-xs ml-2 text-gray-500">
+                    {(fileSpeed[name] / 1024).toFixed(1)} KB/s
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      <ToastContainer />
+    </div>
+  );
+}
+
+export default NewProject;
