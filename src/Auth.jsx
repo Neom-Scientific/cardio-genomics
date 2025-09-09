@@ -106,11 +106,11 @@ const Auth = () => {
                         className="w-full max-w-md flex flex-col gap-4"
                         onSubmit={handleSubmit}
                     >
-                        <h2 className="text-2xl font-bold mb-2">LOGIN</h2>
+                        <h2 className="text-2xl font-bold mb-2 text-black">LOGIN</h2>
                         <div>
-                            <label className="block font-semibold mb-1">Username</label>
+                            <label className="block font-semibold mb-1 text-black">Username</label>
                             <input
-                                className="w-full px-4 py-2 border rounded focus:outline-none"
+                                className="w-full px-4 py-2 border rounded focus:outline-none text-black"
                                 type="text"
                                 name="username"
                                 placeholder="Username"
@@ -121,10 +121,10 @@ const Auth = () => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Password</label>
+                            <label className="block font-semibold mb-1 text-black">Password</label>
                             <div className="relative">
                                 <input
-                                    className="w-full px-4 py-2 border rounded focus:outline-none pr-10"
+                                    className="w-full px-4 py-2 border rounded focus:outline-none pr-10 text-black"
                                     type={showPassword ? 'text' : 'password'}
                                     name="password"
                                     placeholder="Password"
@@ -157,7 +157,7 @@ const Auth = () => {
                         >
                             Submit
                         </button>
-                        <div className="text-center text-sm mt-2">
+                        <div className="text-center text-sm mt-2 text-black">
                             Don't have Username and password?{' '}
                             <span
                                 className="text-blue-600 underline cursor-pointer"
@@ -175,11 +175,11 @@ const Auth = () => {
                         className="w-full max-w-md flex flex-col gap-4"
                         onSubmit={handleSignupSubmit}
                     >
-                        <h2 className="text-2xl font-bold mb-2">SIGN UP</h2>
+                        <h2 className="text-2xl font-bold mb-2 text-black">SIGN UP</h2>
                         <div>
-                            <label className="block font-semibold mb-1">Name</label>
+                            <label className="block font-semibold mb-1 text-black">Name</label>
                             <input
-                                className="w-full px-4 py-2 border rounded focus:outline-none"
+                                className="w-full px-4 py-2 border rounded focus:outline-none text-black"
                                 type="text"
                                 name="name"
                                 placeholder="Name"
@@ -189,9 +189,9 @@ const Auth = () => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Organization Name</label>
+                            <label className="block font-semibold mb-1 text-black">Organization Name</label>
                             <input
-                                className="w-full px-4 py-2 border rounded focus:outline-none"
+                                className="w-full px-4 py-2 border rounded focus:outline-none text-black"
                                 type="text"
                                 name="hospital_name"
                                 placeholder="Organization Name"
@@ -201,9 +201,9 @@ const Auth = () => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Email</label>
+                            <label className="block font-semibold mb-1 text-black">Email</label>
                             <input
-                                className="w-full px-4 py-2 border rounded focus:outline-none"
+                                className="w-full px-4 py-2 border rounded focus:outline-none text-black"
                                 type="email"
                                 name="email"
                                 placeholder="Email"
@@ -213,9 +213,9 @@ const Auth = () => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Phone Number</label>
+                            <label className="block font-semibold mb-1 text-black">Phone Number</label>
                             <input
-                                className="w-full px-4 py-2 border rounded focus:outline-none"
+                                className="w-full px-4 py-2 border rounded focus:outline-none text-black"
                                 type="tel"
                                 name="phone_no"
                                 placeholder="Phone Number"
@@ -230,7 +230,7 @@ const Auth = () => {
                         >
                             SignUp
                         </button>
-                        <div className="text-center text-sm mt-2">
+                        <div className="text-center text-sm mt-2 text-black">
                             Already have an account?{' '}
                             <span
                                 className="text-blue-600 underline cursor-pointer"
