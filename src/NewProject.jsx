@@ -120,7 +120,8 @@ function NewProject({ onShowAnalysis }) {
       toast.error(validProcess.data.message);
       return;
     }
-
+    // console.log('email:', email, ' projectName:', projectName, ' sessionId:', sessionId, ' testName:', testName);
+    // console.log('number of samples:', sampleIds.length);
     if (validProcess.status === 200) {
       if (validProcess.status === 200) {
         // Create an array of upload tasks (functions)
@@ -159,7 +160,7 @@ function NewProject({ onShowAnalysis }) {
             while (!success && attempts < maxRetries) {
               try {
                 await axios.post(
-                  `${process.env.REACT_APP_URL}upload?sessionId=${sessionId}&chunkIndex=${i}&fileName=${encodeURIComponent(file.name)}&projectName=${encodeURIComponent(projectName)}&email=${encodeURIComponent(email)}&processingMode=${encodeURIComponent("hyper_mode")}&application_type=${encodeURIComponent("cardio")}`,
+                  `${process.env.REACT_APP_URL}upload?sessionId=${sessionId}&chunkIndex=${i}&fileName=${encodeURIComponent(file.name)}&projectName=${encodeURIComponent(projectName)}&email=${encodeURIComponent(email)}&processingMode=${encodeURIComponent("hyper_mode")}&application_type=${encodeURIComponent("cardio")}&testName=${encodeURIComponent(testName)}&numberofsamples=${sampleIds.length}`,
                   formData,
                   {
                     headers: { 'Content-Type': 'multipart/form-data' },
@@ -234,7 +235,7 @@ function NewProject({ onShowAnalysis }) {
     <div className="mx-auto py-8 px-4">
       <label className="block text-lg font-semibold mb-2">Project Name</label>
       <input
-        className="w-1/2 mb-6 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-400"
+        className="w-1/2 mb-6 px-4 py-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-orange-400"
         type="text"
         value={projectName}
         onChange={(e) => setProjectName(e.target.value)}
@@ -261,14 +262,14 @@ function NewProject({ onShowAnalysis }) {
 
       <label className="block text-xl font-bold mb-2">Select the Type of Test</label>
       <select
-      className='w-1/2 mb-6 px-4 py-2 border rounded bg-white text-black'
-      onChange={(e)=>setTestName(e.target.value)}
-      value={testName}
+        className='w-1/2 mb-6 px-4 py-2 border rounded bg-white text-black'
+        onChange={(e) => setTestName(e.target.value)}
+        value={testName}
       >
         <option value=''>Select Test Type</option>
         <option value='cmp'>CMP</option>
         <option value='cms'>CMS</option>
-        <option value='cadd'>CADD</option>
+        <option value='cad'>CAD</option>
       </select>
 
 
@@ -304,7 +305,7 @@ function NewProject({ onShowAnalysis }) {
       </div>
       {showProgressModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md flex flex-col items-center">
+          <div className="bg-white rounded-lg shadow-lg text-black p-8 w-full max-w-md flex flex-col items-center">
             <span className="text-lg font-semibold mb-4">Uploading Files...</span>
             {/* Add scrollable container here */}
             <div className="w-full space-y-4 max-h-80 overflow-y-auto">
