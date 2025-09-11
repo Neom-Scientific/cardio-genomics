@@ -7,6 +7,7 @@ import Auth from "./Auth";
 import Header from "./Header";
 import Help from "./Help";
 import AnimatedBackground from "./AnimatedBackground";
+import Reports from "./Reports";
 
 function App() {
   const [activeTab, setActiveTab] = useState("home");
@@ -39,6 +40,7 @@ function App() {
     { key: "new_project", label: "New Project" },
     { key: "project_analysis", label: "Project Analysis" },
     { key: "result", label: "Result" },
+    {key: "reports", label: "Reports"},
     { key: "help", label: "Help" },
   ];
 
@@ -73,7 +75,7 @@ function App() {
         {activeTab === "home" && <Home />}
         {activeTab === "new_project" && <NewProject onShowAnalysis={()=>setActiveTab('project_analysis')} />}
         {activeTab === "project_analysis" && <ProjectAnalysis />}
-        {activeTab === "result" && <div className="text-center text-2xl text-orange-500">this tab is under devlopment</div>}
+        {activeTab === "result" && <Reports/>}
         {activeTab === "help" && <Help/>}
       </div>
     </div>
